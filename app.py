@@ -86,32 +86,42 @@ TEXT_STYLE = {
 
 # region dataframes & ML
 df_ultimate_df = pd.read_csv("ultimate_df.csv")
+df_ultimate_df=df_ultimate_df[df_ultimate_df['Prix du m2 bâti'].isna()==False].copy()
+df_ultimate_df.reset_index(inplace=True, drop=True)
+df_clean_hopital = pd.read_csv("clean_hopital.csv")
 
 
 def get_location(df, dict_d):
     # Filtering the df on price m2
     filtered_df = df[df['Prix du m2 bâti'] <= dict_d['prix_m2']]
+    filtered_df.reset_index(inplace=True, drop=True)
     if filtered_df.shape[0] < 5000:
-        return('Désolé, il va falloir revoir vos critères prix et/ou superficie')
+        return 'Désolé, il va falloir revoir vos critères prix et/ou superficie'
     else:
         features_col = [key for key, value in dict_d.items() if value != 0]
         features_col.remove('prix_m2')
         list_input = [value for key, value in dict_d.items() if value != 0]
+        if len(features_col)==0:
+          return np.array(np.full((1, 5000), 0.5)), np.array(filtered_df.sample(5000).index).reshape(1, 5000)
         # Define X:
         X = filtered_df[features_col]
         # Transform X
         scaler = MinMaxScaler().fit(X)
-        X_scaled = scaler.transform(X)
+        X_scaled = abs(1-scaler.transform(X))
         # Fit NN:
         nbrs = NearestNeighbors(
-            n_neighbors=5000, algorithm='ball_tree').fit(X_scaled)
+            n_neighbors=10000, algorithm='auto').fit(X)
+
+        list_input = list(map(lambda x : abs(1-x),list_input))
         distances, indices = nbrs.kneighbors([list_input[:-1]])
+        
         return distances, indices
 
 
-dict_dist = {'dist_maternelle': 0.000001, 'dist_primaire': 0.000001, 'dist_college': 0.000001,
-             'dist_lycee': 0.000001, 'dist_hopital': 0.000001,
-             'dist_bus': 0.000001, 'dist_magasins': 0.000001, 'prix_m2': 2001}
+# region figure definitions
+dict_dist = {'dist_maternelle': 0, 'dist_primaire':0 , 'dist_college': 0,
+             'dist_lycee': 0, 'dist_hopital': 0,
+             'dist_bus': 0, 'dist_magasins': 0, 'prix_m2': 5000}
 # def get_location(df, primaire, maternelle, college, lycee, hopital, bus, magasins, prix_m2):
 #   # Filtering the df on price m2
 #   filtered_df = df[df['Prix du m2 bâti'] <= prix_m2]
@@ -136,17 +146,21 @@ dict_dist = {'dist_maternelle': 0.000001, 'dist_primaire': 0.000001, 'dist_colle
 
 # region figure definitions
 test = get_location(df_ultimate_df, dict_dist)
-for i in reversed(test[1]):
-    for j in reversed(test[0]):
+filtered_df = df_ultimate_df[df_ultimate_df['Prix du m2 bâti'] <= dict_dist['prix_m2']]
+filtered_df.reset_index(inplace=True, drop=True)
+for i in test[1]:
+    for j in test[0]:
         fig = px.scatter_mapbox(
-            df_ultimate_df.loc[i], lat="lat",  lon="long", color=j, width=1500,height=700, zoom=10, opacity=0.3)
+            filtered_df.loc[i], lat="lat",  lon="long", color=j, width=1500,height=700, zoom=10, opacity=0.3, hover_name="dist_hopital")
 fig.update_layout(mapbox_style="open-street-map")
 fig.update_layout(margin={'r':1, 't':0, 'l':0, 'b':0})
 fig.update_coloraxes(colorbar_tickmode='array')
 fig.update_coloraxes(colorbar_tickvals=[test[0].min(),test[0].max()])
 fig.update_coloraxes(colorbar_title_text="Compatibilité")
-fig.update_coloraxes(colorbar_ticktext=['100 %','0 %'])
+fig.update_coloraxes(colorbar_ticktext=['Max','Min'])
 
+fig2 = (px.scatter_mapbox(df_clean_hopital, lat='lat', lon='long', size='long', opacity=0.4))
+fig.add_trace(fig2.data[0])
 # endregion
 
 
@@ -184,7 +198,7 @@ interest_menu = dbc.Row(align='left',children=[
             dcc.Dropdown(
                 id='ecole_primaire_dd',
                 options=[
-                    {'label': 'Pas important', 'value': 0/5000},
+                    {'label': 'Pas important', 'value': 0},
                     {'label': 'Moins de 500 m', 'value': 500/5000},
                     {'label': 'Moins de 1 km', 'value': 1000/5000},
                     {'label': 'Moins de 5 km', 'value': 5000/5000},
@@ -195,7 +209,7 @@ interest_menu = dbc.Row(align='left',children=[
             dcc.Dropdown(
                 id='college_dd',
                 options=[
-                    {'label': 'Pas important', 'value': 0/10000},
+                    {'label': 'Pas important', 'value': 0},
                     {'label': 'Moins de 500 m', 'value': 500/10000},
                     {'label': 'Moins de 1 km', 'value': 1000/10000},
                     {'label': 'Moins de 5 km', 'value': 5000/10000},
@@ -207,7 +221,7 @@ interest_menu = dbc.Row(align='left',children=[
             dcc.Dropdown(
                 id='lycee_dd',
                 options=[
-                    {'label': 'Pas important', 'value': 0/10000},
+                    {'label': 'Pas important', 'value': 0},
                     {'label': 'Moins de 500 m', 'value': 500/10000},
                     {'label': 'Moins de 1 km', 'value': 1000/10000},
                     {'label': 'Moins de 5 km', 'value': 5000/10000},
@@ -219,12 +233,12 @@ interest_menu = dbc.Row(align='left',children=[
             dcc.Dropdown(
                 id='chr_dd',
                 options=[
-                    {'label': 'Pas important', 'value': 0/20000},
+                    {'label': 'Pas important', 'value': 0},
                     {'label': 'Moins de 500 m', 'value': 500/20000},
                     {'label': 'Moins de 1 km', 'value': 1000/20000},
                     {'label': 'Moins de 5 km', 'value': 5000/20000},
                     {'label': 'Moins de 10 km', 'value': 10000/20000},
-                    {'label': 'Moins de 10 km', 'value': 20000/20000},
+                    {'label': 'Moins de 20 km', 'value': 20000/20000},
                 ],
                 value=0
             ),
@@ -244,7 +258,7 @@ interest_menu = dbc.Row(align='left',children=[
             dcc.Dropdown(
                 id='transport_dd',
                 options=[
-                    {'label': 'Pas important', 'value': 0/2000},
+                    {'label': 'Pas important', 'value': 0},
                     {'label': 'Moins de 500 m', 'value': 500/2000},
                     {'label': 'Moins de 1 km', 'value': 1000/2000},
                     {'label': 'Moins de 2 km', 'value': 2000/2000},
@@ -387,19 +401,21 @@ def update_var_budget(col_value):
 )
 def update_graph(n_clicks):
     test = get_location(df_ultimate_df, dict_dist)
-    for i in reversed(test[1]):
-        for j in reversed(test[0]):
+    filtered_df = df_ultimate_df[df_ultimate_df['Prix du m2 bâti'] <= dict_dist['prix_m2']]
+    filtered_df.reset_index(inplace=True, drop=True)
+    for i in test[1]:
+        for j in test[0]:
             fig = px.scatter_mapbox(
-                df_ultimate_df.loc[i], lat="lat",  lon="long",color=j, size_max=10,width=1500,height=700, zoom=10, opacity=0.3)
-    fig.update_layout()
+                filtered_df.loc[i], lat="lat",  lon="long", color=j, width=1500,height=700, zoom=10, opacity=0.3, hover_name="dist_hopital")
     fig.update_layout(mapbox_style="open-street-map")
     fig.update_layout(margin={'r':1, 't':0, 'l':0, 'b':0})
     fig.update_coloraxes(colorbar_tickmode='array')
-    fig.update_coloraxes(colorbar_tickvals=[0,1])
+    fig.update_coloraxes(colorbar_tickvals=[test[0].min(),test[0].max()])
     fig.update_coloraxes(colorbar_title_text="Compatibilité")
-    fig.update_coloraxes(colorbar_ticktext=['100 %','0 %'])
-    # fig.update_coloraxes(colorbar_xpad=0)
-    # fig.update_coloraxes(colorbar_x=1)
+    fig.update_coloraxes(colorbar_ticktext=['Max','Min'])
+
+    fig2 = (px.scatter_mapbox(df_clean_hopital, lat='lat', lon='long', size='long', opacity=0.4))
+    fig.add_trace(fig2.data[0])
     return fig
 
 # Validation button
