@@ -11,7 +11,7 @@ Requirements:
     - Numpy   
     - Plotly   
     
-To use clone the production branch, install requirements, run the following terminal commands:
+To use clone the production branch, install requirements, run the following terminal commands in your virtual environment:
 
     $ pip install -r requirements.txt
     $ python app.py
