@@ -6,6 +6,7 @@ to improve the offer<br/>
 
 Requirements:   
     - Dash   
+    - Dash Bootstrap Components   
     - Pandas   
     - Numpy   
     - Plotly   
